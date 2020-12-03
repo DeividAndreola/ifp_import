@@ -139,14 +139,14 @@ def anim_direction():
 	aobj=bpy.context.active_object
 	pose=aobj.pose
 	pose_bones=pose.bones
-	
+
 	root_pose_bone=get_bone( pose_bones, 0 )
 	root_quat = Quaternion( ( sqrt(1/2), 0, 0, sqrt(1/2) ) )
 	root_quat = root_pose_bone.bone.matrix.to_quaternion().inverted() * root_quat
 	if 0 > root_quat.dot( root_pose_bone.rotation_quaternion ): root_quat *= -1
 	root_pose_bone.rotation_quaternion = root_quat
-	root_pose_bone.location = root_pose_bone.bone.matrix.to_quaternion().inverted() * ( -1 * root_pose_bone.bone.head )
-	
+	root_pose_bone.location = root_pose_bone.bone.matrix.to_quaternion().inverted() @ ( -1 * root_pose_bone.bone.head )
+
 	if gta_tools.ifp_props.use_pelvis:
 		pelvis_pose_bone=get_bone( pose_bones, 1 )
 		pelvis_quat = Quaternion( ( 0.5, -0.5, -0.5, -0.5 ) )
@@ -422,6 +422,8 @@ def import_ifp( filepath, mode ):
 		frame_rate = ifp_props.frame_rate
 	else:
 		frame_rate = bpy.context.scene.render.fps
+
+	print("Frame Rate: " + frame_rate.__str__())
 	
 	## Open File
 	try:
@@ -439,8 +441,7 @@ def import_ifp( filepath, mode ):
 	# // Note: Offsets are always relative to the current file position.
 	
 	ifp_struct.format = bytes.decode( file.read( 4 ), errors='replace' ).split( '\0' )[0]
-	
-	
+
 	end_of_file = struct.unpack( "<i", file.read( 4 ) )[0] + file.tell()
 	#print( fourcc, end_of_file )
 	
@@ -634,7 +635,7 @@ def import_ifp( filepath, mode ):
 				type_fram=data[0]
 				num_frams=data[1]
 				bone_id=data[2]
-				#print( obj_name, bone_id, type_fram, num_frams, bone_id )
+				#print( obj_name, bone_id, type_fram, num_frams )
 				
 				if flg_load_anim and ( ifp_props.active_anim_id == ianim ):
 					obj = ClassIFPObj()
@@ -824,6 +825,7 @@ def import_ifp( filepath, mode ):
 			
 			## get Bone entry
 			pose_bone = get_bone( pose_bones, obj.bid )
+
 			if None == pose_bone:
 				print( "  - Not Found : Bone ID #%d" %( obj.bid ) )
 				pose_bone=get_bone_by_org_name( pose_bones, obj.name )
@@ -841,7 +843,7 @@ def import_ifp( filepath, mode ):
 			## get Anim-Range for FCurves
 			anim_ini = float( obj.frams[0].time  + time_ofs )
 			anim_fin = float( obj.frams[-1].time + time_ofs )
-			
+
 			## set Position
 			if "KR00" != obj.kfrm:
 				## Params foe setting POS
@@ -850,11 +852,11 @@ def import_ifp( filepath, mode ):
 				if None != pose_bone.bone.parent:
 					pbone = pose_bone.bone.parent
 					pos_ofs = pose_bone.bone.head.copy() + Vector( ( 0.0, pbone.length, 0.0 ) )  # ??? bone.head seems offsetted by the tail of its parent ???
-				
+
 				for fram in obj.frams:
 					fram_time = float( fram.time + time_ofs )
 					pos = Vector ( fram.pos )
-					
+
 					## split Root-POS into Armature and Root-Bone
 					if root_pose_bone == pose_bone:
 						pos -= pose_bone.bone.head
@@ -872,19 +874,19 @@ def import_ifp( filepath, mode ):
 						bpos.rotate( root_quat_ofs )
 						bpos += root_co_ofs
 						bpos.rotate( pose_bone.bone.matrix.to_quaternion().inverted() )
-						
+
 						## set POS sequences for FCurves
 						for ixyz in range( 3 ):
 							aseq[ixyz] += [ fram_time, apos[ixyz] ]
 							bseq[ixyz] += [ fram_time, bpos[ixyz] ]
-					
+
 					## set POS sequences for FCurves of child bones
 					elif not ifp_props.skip_pos or not ifp_props.skip_children:
 						pos -= pos_ofs
 						pos.rotate( pose_bone.bone.matrix.to_quaternion().inverted() )
 						for ixyz in range( 3 ):
 							bseq[ixyz] += [ fram_time, pos[ixyz] ]
-				
+
 				## set POS sequences to FCurves
 				if root_pose_bone == pose_bone:
 					if not skip_root_flg:

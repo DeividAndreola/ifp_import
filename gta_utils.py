@@ -50,6 +50,9 @@ class ClassHookState:
 ## Global Variables
 hook_state = ClassHookState()
 
+
+BLOPT_REGISTER = {'REGISTER', 'UNDO', 'INTERNAL'}
+
 ## Functions
 def get_root( obj, depth ):
 	if None == obj.parent or 0 == depth:
